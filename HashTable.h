@@ -1,71 +1,93 @@
-#ifndef HASHTABLE_H
-#define HASHTABLE_H
-
-#include <ostream>
+#include <iostream>
+#include <string>
 #include <stdexcept>
 #include "Dict.h"
+#include "ListLinked.h"
 #include "TableEntry.h"
 
-#include "ListLinked.h"
-
 template <typename V>
-class HashTable: public Dict<V> {
-
+class HashTable : public Dict<V> {
 private:
-    int n; // Número de elementos almacenados actualmente
-    int max; // Tamaño de la tabla hash
-    ListLinked<TableEntry<V>>* table; // Array de listas enlazadas
+    int n; // Número de elementos almacenados
+    int max; // Tamaño total de la tabla (número de cubetas)
+    ListLinked<TableEntry<V>>* table; // Array de punteros a listas enlazadas
 
-    // Función hash
-    int h(const std::string& key) {
-        int ascii_sum = 0;
-        for (char c : key) {
-            ascii_sum += static_cast<int>(c);
-        }
-        return ascii_sum % max;
+    // Función hash para calcular la posición en la tabla
+    int h(std::string key) const {
+        int sum = 0;
+        for (char c : key)
+            sum += static_cast<int>(c);
+        return sum % max;
     }
 
 public:
     // Constructor
     HashTable(int size) : n(0), max(size) {
-        table = new ListLinked<TableEntry<V>>[max]; // Reserva dinámica
+        table = new ListLinked<TableEntry<V>>[max];
     }
 
     // Destructor
     ~HashTable() {
-        delete[] table; // Liberar memoria dinámica
+        delete[] table;
     }
 
-    // Devuelve el número total de cubetas
-    int capacity() const {
+    // Inserción de un par clave->valor
+    void insert(std::string key, V value) override {
+        int index = h(key);
+        TableEntry<V> entry(key, value);
+
+        // Verificar si la clave ya existe
+        if (table[index].search(TableEntry<V>(key)) != -1)
+            throw std::runtime_error("La clave ya existe en el diccionario.");
+
+        table[index].prepend(entry);
+        n++;
+    }
+
+    // Búsqueda de un valor por su clave
+    V search(std::string key) const override {
+        int index = h(key);
+        int pos = table[index].search(TableEntry<V>(key));
+        if (pos == -1)
+            throw std::runtime_error("Clave no encontrada.");
+
+        return table[index].get(pos).value;
+    }
+
+    // Eliminación de un par clave->valor
+    V remove(std::string key) override {
+        int index = h(key);
+        int pos = table[index].search(TableEntry<V>(key));
+        if (pos == -1)
+            throw std::runtime_error("Clave no encontrada.");
+
+        TableEntry<V> entry = table[index].get(pos);
+        table[index].remove(pos);
+        n--;
+        return entry.value;
+    }
+
+    // Número de elementos en la tabla
+    int entries() const override {
+        return n;
+    }
+
+    // Capacidad total de la tabla (número de cubetas)
+    int capacity() {
         return max;
     }
 
-    // Sobrecarga del operador de salida
-    friend std::ostream& operator<<(std::ostream& out, const HashTable<V>& th) {
-        for (int i = 0; i < th.max; ++i) {
-            out << "Cubeta " << i << ": ";
-            for (const auto& entry : th.table[i]) {
-                out << "[" << entry.key << " -> " << entry.value << "] ";
-            }
-            out << std::endl;
+    // Sobrecarga del operador []
+    V operator[](std::string key) {
+        return search(key);
+    }
+
+    // Sobrecarga del operador << para imprimir la tabla
+    friend std::ostream& operator<<(std::ostream& out, const HashTable<V>& ht) {
+        for (int i = 0; i < ht.max; ++i) {
+            out << "Cubeta " << i << ": " << ht.table[i] << "\n";
         }
         return out;
     }
-
-    // Sobrecarga del operador []
-    V operator[](const std::string& key) {
-        int index = h(key);
-        for (auto& entry : table[index]) {
-            if (entry.key == key) {
-                return entry.value;
-            }
-        }
-        throw std::runtime_error("Key not found");
-    }
-
-    // Otros métodos como insert(), search() y remove() se implementarán aquí,
-    // haciendo uso de las operaciones proporcionadas por ListLinked<T>.
 };
 
-#endif
